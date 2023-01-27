@@ -1,0 +1,3 @@
+[submodule "src/ServerSetup/vendor/Distribution"]
+	path = src/ServerSetup/vendor/Distribution
+	url = git@github.com:TirsvadCLI/Linux.Distribution.git
