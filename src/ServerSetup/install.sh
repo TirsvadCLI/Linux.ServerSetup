@@ -144,9 +144,8 @@ hardness_server() {
 install_nginx() {
     infoscreen "SS Install" "Nginx"
     nginxsetup_remote 1 serverrootcmd
-    nginxsetup_install #nocertbot
+    nginxsetup_install
     [ ! -z $NGINX_DOMAIN_NAMES ] && nginxsetup_add_domain $NGINX_DOMAIN_NAMES
-    # serverrootcmd "apt-get -y install nginx"
     # serverrootcmd "nft add rule inet filter input tcp dport 80 accept"
     # serverrootcmd "nft add rule inet filter input tcp dport 443 accept"
     infoscreendone
@@ -264,9 +263,9 @@ install_postfix_admin() {
 # 
 ################################################################################
 
-# prepare
-# create_user
-# hardness_server
+prepare
+create_user
+hardness_server
 [ ${NGINXSETUP:-0} ] && install_nginx || printf "\nFailed to setup nginx\n"
 # install_certbot
 # install_postgresql
