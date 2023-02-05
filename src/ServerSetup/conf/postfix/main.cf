@@ -1,0 +1,20 @@
+#Enable TLS Encryption when Postfix receives incoming emails
+smtpd_tls_cert_file=/etc/letsencrypt/live/mail.example.com/fullchain.pem
+smtpd_tls_key_file=/etc/letsencrypt/live/mail.example.com/privkey.pem
+smtpd_tls_security_level=may 
+smtpd_tls_loglevel = 1
+smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+
+#Enable TLS Encryption when Postfix sends outgoing emails
+smtp_tls_security_level = may
+smtp_tls_loglevel = 1
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+
+#Enforce TLSv1.3 or TLSv1.2
+smtpd_tls_mandatory_protocols = !SSLv2, !SSLv3, !TLSv1, !TLSv1.1
+smtpd_tls_protocols = !SSLv2, !SSLv3, !TLSv1, !TLSv1.1
+smtp_tls_mandatory_protocols = !SSLv2, !SSLv3, !TLSv1, !TLSv1.1
+smtp_tls_protocols = !SSLv2, !SSLv3, !TLSv1, !TLSv1.1
+
+mailbox_transport = lmtp:unix:private/dovecot-lmtp
+smtputf8_enable = no

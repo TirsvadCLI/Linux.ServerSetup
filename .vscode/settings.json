@@ -1,0 +1,8 @@
+{
+	"editor.formatOnSave": true,
+	"diffEditor.codeLens": true,
+	"diffEditor.ignoreTrimWhitespace": false,
+	"editor.insertSpaces": false,
+	"editor.detectIndentation": false,
+	"editor.formatOnPaste": true
+}

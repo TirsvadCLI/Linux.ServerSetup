@@ -1,0 +1,16 @@
+server {
+	listen 80;
+	listen [::]:80;
+	server_name <NGINX_DOMAIN_NAMES>;
+
+	root <NGINXSETUP_WWW_BASE_PATH><NGINX_DOMAIN_NAMES>/html;
+	index index.html;
+
+	location / {
+		try_files $uri $uri/ =404;		
+	}
+
+	location ~ /.well-known/acme-challenge {
+		allow all;
+	}
+}

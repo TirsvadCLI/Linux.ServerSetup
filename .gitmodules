@@ -1,3 +1,6 @@
-[submodule "src/ServerSetup/vendor/Distribution"]
-	path = src/ServerSetup/vendor/Distribution
+[submodule "src/ServerSetup/vendor/Linux.Distribution"]
+	path = src/ServerSetup/vendor/Linux.Distribution
 	url = git@github.com:TirsvadCLI/Linux.Distribution.git
+[submodule "src/ServerSetup/vendor/Linux.NginxSetup"]
+	path = src/ServerSetup/vendor/Linux.NginxSetup
+	url = git@github.com:TirsvadCLI/Linux.NginxSetup.git
