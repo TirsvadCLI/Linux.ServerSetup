@@ -37,9 +37,9 @@ TCLI_SERVERSETUP_CERTBOT_EMAIL=$(yq eval ".Server.certbotEmail" < $TCLI_SERVERSE
 TCLI_SERVERSETUP_NGINX_SETUP=$(yq eval ".NginxSetup.install" < $TCLI_SERVERSETUP_FILE_CONF)
 TCLI_NGINXSETUP_PATH_CONF=$TCLI_SERVERSETUP_PATH_CONF
 TCLI_NGINXSETUP_PATH_TEMP=$TCLI_SERVERSETUP_PATH_TEMP
-TCLI_NGINXSETUP_WWW_BASE_PATH=$(yq eval ".NginxSetup.Paths.wwwBase" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_WWW_BASE_PATH = null ] && TCLI_NGINXSETUP_WWW_BASE_PATH="/srv/www/"
-TCLI_NGINXSETUP_SITES_AVAILABLE_PATH=$(yq eval ".NginxSetup.Paths.sitesAvailable" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_SITES_AVAILABLE_PATH = null ] && TCLI_NGINXSETUP_SITES_AVAILABLE_PATH="/etc/nginx/sites-available/"
-TCLI_NGINXSETUP_SITES_ENABLED_PATH=$(yq eval ".NginxSetup.Paths.sitesEnabled" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_SITES_ENABLED_PATH = null ] && TCLI_NGINXSETUP_SITES_ENABLED_PATH="/etc/nginx/sites-enabled/"
+TCLI_NGINXSETUP_PATH_WWW_BASE=$(yq eval ".NginxSetup.Paths.wwwBase" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_PATH_WWW_BASE = null ] && TCLI_NGINXSETUP_PATH_WWW_BASE="/srv/www/"
+TCLI_NGINXSETUP_PATH_SITES_AVAILABLE=$(yq eval ".NginxSetup.Paths.sitesAvailable" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_PATH_SITES_AVAILABLE = null ] && TCLI_NGINXSETUP_PATH_SITES_AVAILABLE="/etc/nginx/sites-available/"
+TCLI_NGINXSETUP_PATH_SITES_ENABLED=$(yq eval ".NginxSetup.Paths.sitesEnabled" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_PATH_SITES_ENABLED = null ] && TCLI_NGINXSETUP_PATH_SITES_ENABLED="/etc/nginx/sites-enabled/"
 [ ${TCLI_SERVERSETUP_NGINX_SETUP:-0} ] && . $TCLI_SERVERSETUP_PATH_VENDOR/Linux.NginxSetup/src/NginxSetup/setup.sh
 
 if [ "$(yq eval ".Server.RemoteSetup" < $TCLI_SERVERSETUP_FILE_CONF)" == "null" ]; then
@@ -63,11 +63,12 @@ infoscreendone
 # Alias for server connection after hardness server
 ################################################################################
 tcli_serversetup_serverrootCmd() {
-	[ ${TCLI_SERVERSETUP_SERVERIP:-} ] && ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP $@ || $@
+	[ ${TCLI_SERVERSETUP_SERVERIP:-} ] && ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP $@ # || $@
+	echo "ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP $@"
 }
 
 tcli_serversetup_serverusercmd() {
-	[ ${TCLI_SERVERSETUP_SERVERIP:-} ] && ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS $USERNAME@$TCLI_SERVERSETUP_SERVERIP $@ || su $USERNAME $@
+	[ ${TCLI_SERVERSETUP_SERVERIP:-} ] && ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS $USERNAME@$TCLI_SERVERSETUP_SERVERIP $@ #|| su $USERNAME $@
 }
 
 ################################################################################
@@ -83,11 +84,14 @@ tcli_serversetup_prepare () {
 	# Get passwordless root access
 	sshpass -e ssh-copy-id -p $TCLI_SERVERSETUP_SSHPORT -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub root@$TCLI_SERVERSETUP_SERVERIP
 
+	# Create some path
+	mkdir -p $TCLI_SERVERSETUP_PATH_TEMP/etc/ssh
+
 	# Update and Upgrade
 	infoscreen "SS install" "Update and upgrade OS"
 	tcli_packageManager_system_update
 	tcli_packageManager_system_upgrade
-	tcli_packageManager_install $TCLI_SERVERSETUP_PKGS_SUDO
+	tcli_packageManager_install "sudo"
 	ssh -p $TCLI_SERVERSETUP_SSHPORT root@$TCLI_SERVERSETUP_SERVERIP "hostnamectl set-hostname $primaryHostname"
 	infoscreendone
 }
@@ -169,21 +173,29 @@ tcli_serversetup_hardness_server_firewall() {
 ################################################################################
 tcli_serversetup_cerbot_install() {
 	infoscreen "SS Install" "Certbot"
-	tcli_packageManager_install $TCLI_PKGS_CERTBOT
-	tcli_packageManager_install $TCLI_PKGS_PYTHON_CERTBOT_NGINX
+	tcli_packageManager_install "certbot"
+	tcli_packageManager_install "python3-certbot-nginx"
 	if [[ -d "$TCLI_SERVERSETUP_PATH_CONF/letsencrypt/live" ]]; then
 		[ $TCLI_SERVERSETUP_SERVERIP ] \
 			&& scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/* root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/ \
 			|| cp -r $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/* /etc/letsencrypt/
 	fi
-	tcli_serversetup_serverrootCmd "(2>/dev/null crontab -l ; echo "@daily certbot renew --quiet && systemctl reload postfix dovecot nginx") | crontab -"
+	# tcli_serversetup_serverrootCmd "(2>/dev/null crontab -l ; echo "@daily certbot renew --quiet && systemctl reload postfix dovecot nginx") | crontab -"
 	infoscreendone
 }
 
 # param
 #		<hostname>
 tcli_serversetup_cerbot_add_certificate() {
-	tcli_serversetup_serverrootCmd "certbot certonly -a nginx --agree-tos --no-eff-email --staple-ocsp --email $TCLI_SERVERSETUP_CERTBOT_EMAIL -d $1"
+		if [ -d $($TCLI_SERVERSETUP_PATH_CONF/letsencrypt/live/$1) ]; then
+			scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/live/$1/ root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/live/
+			scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/archive/$1/ root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/archive/
+			tcli_serversetup_serverrootCmd "echo 1 | certbot --nginx -d $1"
+			# tcli_serversetup_serverrootCmd "echo 1 | certbot --nginx --agree-tos --email $TCLI_SERVERSETUP_CERTBOT_EMAIL -d $1"
+		else
+			tcli_serversetup_serverrootCmd "certbot certonly -a nginx --agree-tos --no-eff-email --staple-ocsp --email $TCLI_SERVERSETUP_CERTBOT_EMAIL -d $1"
+			echo "${BASH_SOURCE}:${FUNCNAME}:${LINENO} undo comments"
+		fi
 }
 
 ################################################################################
@@ -191,24 +203,16 @@ tcli_serversetup_cerbot_add_certificate() {
 ################################################################################
 tcli_serversetup_nginx_install() {
 	infoscreen "SS Install" "Nginx"
-	tcli_nginxsetup_remote 1 tcli_serversetup_serverrootCmd
+	tcli_nginxsetup_remote $TCLI_SERVERSETUP_SERVERIP $TCLI_SERVERSETUP_SSHPORT_HARDNESS
 	tcli_nginxsetup_install
 	declare -i c=$(yq e '.NginxSetup.WebSites | length' < $TCLI_SERVERSETUP_FILE_CONF)
-	echo "c is $c"
 	for (( i=0; i < $c; i++ )); do
 		declare s=$(yq eval ".NginxSetup.WebSites[$i]" < $TCLI_SERVERSETUP_FILE_CONF)
 		declare domainName=$(yq eval ".NginxSetup.WebSites[$i].domainName" < $TCLI_SERVERSETUP_FILE_CONF)
 		declare siteType=$(yq eval ".NginxSetup.WebSites[$i].siteType" < $TCLI_SERVERSETUP_FILE_CONF)
-		echo "setting up website $domainName as a $siteType"
-		tcli_nginxsetup_add_domain "$domainName" "$siteType"
-		if [ -d $($TCLI_SERVERSETUP_PATH_CONF/letsencrypt/live/$domainName) ]; then
-			scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/live/$domainName/ root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/live/
-			scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/archive/$domainName/ root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/archive/
-			$tcli_serversetup_serverrootCmd "echo 1 | certbot --nginx -d $domainName"
-		else
-			# tcli_serversetup_cerbot_add_certificate $domainName
-			echo "${BASH_SOURCE}:${FUNCNAME}:${LINENO} undo comments"
-		fi
+		printf "\n\n$i setting up website $domainName as a $siteType\n\n"
+		tcli_nginxsetup_add_domain $domainName $siteType
+		# tcli_serversetup_cerbot_add_certificate $domainName
 	done
 	infoscreendone
 }
