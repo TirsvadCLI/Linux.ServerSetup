@@ -4,3 +4,6 @@
 [submodule "src/ServerSetup/vendor/Linux.NginxSetup"]
 	path = src/ServerSetup/vendor/Linux.NginxSetup
 	url = git@github.com:TirsvadCLI/Linux.NginxSetup.git
+[submodule "src/ServerSetup/vendor/Linux.PackageManager"]
+	path = src/ServerSetup/vendor/Linux.PackageManager
+	url = git@github.com:TirsvadCLI/Linux.PackageManager.git

@@ -1,283 +1,221 @@
 #!/bin/bash
 IFS=$'\n\t'
 
-# Setting some path
-declare -r DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-declare -r DIR_CONF="$( cd "$DIR/conf" && pwd )"
-declare -r DIR_TOOLS="$( cd "$DIR/tools" && pwd )"
+# Setting path structure and file
+declare -r TCLI_SERVERSETUP_PATH_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+declare -r TCLI_SERVERSETUP_PATH_CONF="$TCLI_SERVERSETUP_PATH_ROOT/conf"
+declare -r TCLI_SERVERSETUP_PATH_INC="$TCLI_SERVERSETUP_PATH_ROOT/inc"
+declare -r TCLI_SERVERSETUP_PATH_LOG="$TCLI_SERVERSETUP_PATH_ROOT/log"
+declare -r TCLI_SERVERSETUP_PATH_TEMP="$TCLI_SERVERSETUP_PATH_ROOT/temp"
+declare -r TCLI_SERVERSETUP_PATH_VENDOR="$TCLI_SERVERSETUP_PATH_ROOT/vendor"
 
-[ ! -d "$DIR/log" ] && mkdir "$DIR/log"
-rm $DIR/log/*.*
-declare -r FILE_LOG="$( cd "$DIR/log" && pwd )/$$.log"
+[ ! -d "$TCLI_SERVERSETUP_PATH_LOG" ] && mkdir "$TCLI_SERVERSETUP_PATH_LOG" || rm -f $TCLI_SERVERSETUP_PATH_LOG/*.*
 
-exec 3>&1 1>>${FILE_LOG} 2>&1
+declare -r TCLI_SERVERSETUP_FILE_LOG="$( cd "$TCLI_SERVERSETUP_PATH_LOG" && pwd )/$$.log"
 
-printf "################################################################################\n" 1>&3
-printf "#                            Linux Server Setup                                #\n" 1>&3
-printf "#                         SS => Server Side action                             #\n" 1>&3
-printf "################################################################################\n" 1>&3
+exec 3>&1 4>&2
+exec 1>$TCLI_SERVERSETUP_FILE_LOG 2>&1
 
-. $DIR/vendor/Linux.Distribution/src/Distribution/distribution.sh
-. $DIR_TOOLS/functions.sh
-. $DIR_TOOLS/precheck.sh
+printf "\n################################################################################\n" >&3
+printf "#                            Linux Server Setup                                #\n" >&3
+printf "#                         SS => Server Side action                             #\n" >&3
+printf "################################################################################\n" >&3
+. $TCLI_SERVERSETUP_PATH_VENDOR/Linux.Distribution/src/Distribution/distribution.sh
+. $TCLI_SERVERSETUP_PATH_VENDOR/Linux.PackageManager/src/PackageManager/PackageManager.sh
+. $TCLI_SERVERSETUP_PATH_INC/functions.sh
 
-rm -fr $DIR/temp/
-mkdir -p $DIR/temp/etc/dovecot/conf.d
-mkdir $DIR/temp/etc/nginx
-mkdir $DIR/temp/etc/postfix
-mkdir $DIR/temp/etc/ssh
+infoscreen "Loading" "Setting configuration"
 
-if [ ! -f "$DIR_CONF/settings.sh" ]; then
-    infoscreen "Loading" "Default configuration file"
-    . $DIR_CONF/default.settings.sh
-    infoscreendone
+[ -f "$TCLI_SERVERSETUP_PATH_CONF/settings.yaml" ] && TCLI_SERVERSETUP_FILE_CONF=$TCLI_SERVERSETUP_PATH_CONF/settings.yaml || TCLI_SERVERSETUP_FILE_CONF=$TCLI_SERVERSETUP_PATH_CONF/settings.default.yaml
+. $TCLI_SERVERSETUP_PATH_INC/precheck.sh
+TCLI_SERVERSETUP_PRIMARYHOSTANME=$(yq eval ".primaryHostname" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_PRIMARYHOSTANME = null ] && infoscreenwarn "$TCLI_SERVERSETUP_FILE_CONF missing configuration of primaryHostname"
+TCLI_SERVERSETUP_SSHPORT=$(yq eval ".Server.RemoteSetup.sshPort" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_SSHPORT = null ] && TCLI_SERVERSETUP_SSHPORT=22
+TCLI_SERVERSETUP_SSHPORT_HARDNESS=$(yq eval ".Server.RemoteSetup.sshPortHardness" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_SSHPORT_HARDNESS = null ] && TCLI_SERVERSETUP_SSHPORT_HARDNESS=10233
+# Certbot
+TCLI_SERVERSETUP_CERTBOT_EMAIL=$(yq eval ".Server.certbotEmail" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_CERTBOT_EMAIL = null ] && TCLI_SERVERSETUP_CERTBOT_EMAIL="admin@"
+# Vendor TCLI_NGINXSETUP vars
+TCLI_SERVERSETUP_NGINX_SETUP=$(yq eval ".NginxSetup.install" < $TCLI_SERVERSETUP_FILE_CONF)
+TCLI_NGINXSETUP_PATH_CONF=$TCLI_SERVERSETUP_PATH_CONF
+TCLI_NGINXSETUP_PATH_TEMP=$TCLI_SERVERSETUP_PATH_TEMP
+TCLI_NGINXSETUP_WWW_BASE_PATH=$(yq eval ".NginxSetup.Paths.wwwBase" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_WWW_BASE_PATH = null ] && TCLI_NGINXSETUP_WWW_BASE_PATH="/srv/www/"
+TCLI_NGINXSETUP_SITES_AVAILABLE_PATH=$(yq eval ".NginxSetup.Paths.sitesAvailable" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_SITES_AVAILABLE_PATH = null ] && TCLI_NGINXSETUP_SITES_AVAILABLE_PATH="/etc/nginx/sites-available/"
+TCLI_NGINXSETUP_SITES_ENABLED_PATH=$(yq eval ".NginxSetup.Paths.sitesEnabled" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_NGINXSETUP_SITES_ENABLED_PATH = null ] && TCLI_NGINXSETUP_SITES_ENABLED_PATH="/etc/nginx/sites-enabled/"
+[ ${TCLI_SERVERSETUP_NGINX_SETUP:-0} ] && . $TCLI_SERVERSETUP_PATH_VENDOR/Linux.NginxSetup/src/NginxSetup/setup.sh
+
+if [ "$(yq eval ".Server.RemoteSetup" < $TCLI_SERVERSETUP_FILE_CONF)" == "null" ]; then
+	# Need root access if script is running on server we working on.
+	[[ $EUID -ne 0 ]] && infoscreenfailed "This script must be run as root or runned localy with shh to server"
 else
-    infoscreen "Loading" "Custom configuration file"
-    . $DIR_CONF/settings.sh
-    infoscreendone
+	TCLI_SERVERSETUP_SERVERIP=$(yq eval ".Server.RemoteSetup.ip" < $TCLI_SERVERSETUP_FILE_CONF)
+	nc -z -v -w5 $TCLI_SERVERSETUP_SERVERIP $TCLI_SERVERSETUP_SSHPORT || infoscreenfailed "Couldn't reach server at" "$TCLI_SERVERSETUP_SERVERIP : $TCLI_SERVERSETUP_SSHPORT" >&3
+	TCLI_SERVERSETUP_ROMOTE_SERVER=1
+	# TCLI_PKGS need this also
+	TCLI_PACKMANAGER_REMOTE_SERVER=1
+	TCLI_PACKMANAGER_REMOTE_SERVER_IP=$TCLI_SERVERSETUP_SERVERIP
+	TCLI_PACKMANAGER_REMOTE_SERVER_PORT=$TCLI_SERVERSETUP_SSHPORT
 fi
-
-[ ${NGINXSETUP:-0} ] && . $DIR/vendor/Linux.NginxSetup/src/NginxSetup/setup.sh
-
-if [ ! ${SERVER_REMOTE_SETUP:-} ]; then
-    # Need root access if script is running at server
-
-    # check if running as root
-    if [[ $EUID -ne 0 ]]; then
-        echo "This script must be run as root or runned localy with shh to server"
-        exit
-    fi    
+if [ -z ${SSHPASS} ]; then
+	export SSHPASS=$(yq eval ".Server.RemoteSetup.sshRootPass" < $TCLI_SERVERSETUP_FILE_CONF)
 fi
+infoscreendone
 
 ################################################################################
 # Alias for server connection after hardness server
 ################################################################################
-serverrootcmd() {
-    [ ${SERVER_REMOTE_SETUP:-} ] && ssh -p $SSHPORT root@$SERVERIP $@ || $@
+tcli_serversetup_serverrootCmd() {
+	[ ${TCLI_SERVERSETUP_SERVERIP:-} ] && ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP $@ || $@
 }
 
-serverusercmd() {
-    [ ${SERVER_REMOTE_SETUP:-} ] && ssh -p $SSHPORT $USERNAME@$SERVERIP $@ || su $USERNAME $@
+tcli_serversetup_serverusercmd() {
+	[ ${TCLI_SERVERSETUP_SERVERIP:-} ] && ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS $USERNAME@$TCLI_SERVERSETUP_SERVERIP $@ || su $USERNAME $@
 }
 
 ################################################################################
 # Prepare
 ################################################################################
-prepare () {
-    printf "\n\nPrepare ...\n"
-    # We need sshpass
-    if ! (which sshpass >/dev/null)
-    then
-        if ! (sudo apt-get install sshpass)
-        then
-            echo "sshpass need to be installed"
-            exit 1
-        fi
-    fi
+tcli_serversetup_prepare () {
+	local primaryHostname=$(yq eval ".primaryHostname" < $TCLI_SERVERSETUP_FILE_CONF)
+	# Delete old known host
+	ssh-keygen -f ~/.ssh/known_hosts -R "$TCLI_SERVERSETUP_SERVERIP"
+	ssh-keygen -f ~/.ssh/known_hosts -R "[$TCLI_SERVERSETUP_SERVERIP]:$TCLI_SERVERSETUP_SSHPORT"
+	ssh-keygen -f ~/.ssh/known_hosts -R "[$TCLI_SERVERSETUP_SERVERIP]:$TCLI_SERVERSETUP_SSHPORT_HARDNESS"
 
-    # Delete old known host
-    ssh-keygen -f "$LOCAL_USER_HOME_DIR/.ssh/known_hosts" -R "$SERVERIP"
-    ssh-keygen -f "$LOCAL_USER_HOME_DIR/.ssh/known_hosts" -R "[$SERVERIP]:$SSHPORT"
+	# Get passwordless root access
+	sshpass -e ssh-copy-id -p $TCLI_SERVERSETUP_SSHPORT -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub root@$TCLI_SERVERSETUP_SERVERIP
 
-    # Get passwordless root access
-    sshpass -p $SSHPASS ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub root@$SERVERIP
-
-    # Update and Upgrade
-    infoscreen "SS install" "Update and upgrade OS"
-    ssh root@$SERVERIP "apt-get update && apt-get -y upgrade"
-    infoscreenstatus $?
-    ssh root@$SERVERIP "apt-get -y install sudo" # TODO PackageManager
-    ssh root@$SERVERIP "hostnamectl set-hostname $PRIMARY_HOSTNAME"
+	# Update and Upgrade
+	infoscreen "SS install" "Update and upgrade OS"
+	tcli_packageManager_system_update
+	tcli_packageManager_system_upgrade
+	tcli_packageManager_install $TCLI_SERVERSETUP_PKGS_SUDO
+	ssh -p $TCLI_SERVERSETUP_SSHPORT root@$TCLI_SERVERSETUP_SERVERIP "hostnamectl set-hostname $primaryHostname"
+	infoscreendone
 }
 
 ################################################################################
 # Create a superuser
 ################################################################################
-create_user() {
-    if [[ $EUID -eq 0 ]]; then
-        return 1;
-    fi
-    infoscreen "SS Setup" "Create user \"$USERNAME\""
-    # Create a user
-    ssh root@$SERVERIP "useradd -m -p $USERPASSWORD_ENCRYPTED -s /bin/bash $USERNAME"
-    ssh root@$SERVERIP "usermod -a -G sudo $USERNAME"
-
-    # Passwordless user access
-    sshpass -e ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub $USERNAME@$SERVERIP
-    infoscreendone
+tcli_serversetup_create_user() {
+	if [[ $EUID -eq 0 ]]; then
+			return 1;
+	fi
+	local i=0
+	until [ $i -lt 0 ]; do
+		local s=$(yq eval ".Server.Users[$i]" < $TCLI_SERVERSETUP_FILE_CONF)
+		if [ ! "$s" = null ]; then
+			local username=$(yq eval ".Server.Users[$i].name" < $TCLI_SERVERSETUP_FILE_CONF)
+			infoscreen "SS Setup" "Create user \"$username\""
+			local passwordEncrypted=$(yq eval ".Server.Users[$i].passwordEncrypted" < $TCLI_SERVERSETUP_FILE_CONF)
+			local superuser=$(yq eval ".Server.Users[$i].superuser" < $TCLI_SERVERSETUP_FILE_CONF)
+			# validation
+			[[ "$passwordEncrypted" = null || "$username" = null ]] && infoscreenwarn
+			# create user
+			if [ ! $(ssh -p $TCLI_SERVERSETUP_SSHPORT root@$TCLI_SERVERSETUP_SERVERIP "id -u $username") &>/dev/null ]; then
+				ssh -p $TCLI_SERVERSETUP_SSHPORT root@$TCLI_SERVERSETUP_SERVERIP "useradd -m -p $passwordEncrypted -s /bin/bash $username"
+				ssh -p $TCLI_SERVERSETUP_SSHPORT root@$TCLI_SERVERSETUP_SERVERIP "usermod -a -G sudo $username"
+				sshpass -e ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub $username@$TCLI_SERVERSETUP_SERVERIP
+			else
+				infoscreenwarn
+				printf "${FUNCNAME[0]}: WARNING user $username allready exist\n"
+			fi
+			((i=i+1))
+			infoscreendone
+		else
+			i=-1
+		fi
+	done
 }
 
 ################################################################################
-# Hardness Server
+# Hardness Server part1
 ################################################################################
-hardness_server() {
-    infoscreen "SS Setup" "Hardness server (only key access / no password)"
-    # Change sshd_config file and send to server
-    sed "s/<sshport>/$SSHPORT/g" $DIR_CONF/ssh/sshd_config > $DIR/temp/etc/ssh/sshd_config
-    scp $DIR/temp/etc/ssh/sshd_config root@$SERVERIP:/etc/ssh
-    ssh root@$SERVERIP "systemctl restart ssh.service"
-    infoscreendone
-    infoscreen "SS Setup" "Hardness server firewall nftables"
-    serverrootcmd "nft flush ruleset"
-    serverrootcmd "nft add table inet filter"
-    serverrootcmd "nft add chain inet filter input { type filter hook input priority 0 \; policy accept\;}"
-    # allow established/related connections
-    serverrootcmd "nft add rule inet filter input ct state established,related accept"
-    # early drop of invalid connections
-    serverrootcmd "nft add rule inet filter input ct state invalid drop"
-    # allow from loopback
-    serverrootcmd "nft add rule inet filter input iifname lo accept"
-    serverrootcmd "nft add rule inet filter input iif != \"lo\" ip daddr 127.0.0.0/8 drop"
-    # allow icmp
-    serverrootcmd "nft add rule inet filter input ip protocol icmp limit rate 4/second accept"
-    serverrootcmd "nft add rule inet filter input ip6 nexthdr icmpv6 limit rate 4/second accept"
-    serverrootcmd "nft add rule inet filter input tcp dport $SSHPORT accept"
-    serverrootcmd "nft add chain inet filter forward { type filter hook forward priority 0 \; policy accept\; }"
-    serverrootcmd "nft add chain inet filter output { type filter hook output priority 0 \; policy accept\; }"
-    serverrootcmd "nft add chain inet filter input '{ policy drop; }'"
-    infoscreendone
+tcli_serversetup_hardness_server() {
+	infoscreen "SS Setup" "Hardness server (only key access / no password)"
+	# # Change sshd_config file and send to server
+	sed "s/<sshport>/$TCLI_SERVERSETUP_SSHPORT_HARDNESS/g" $TCLI_SERVERSETUP_PATH_CONF/ssh/sshd_config > $TCLI_SERVERSETUP_PATH_TEMP/etc/ssh/sshd_config
+	scp -P $TCLI_SERVERSETUP_SSHPORT $TCLI_SERVERSETUP_PATH_TEMP/etc/ssh/sshd_config root@$TCLI_SERVERSETUP_SERVERIP:/etc/ssh
+	ssh -p $TCLI_SERVERSETUP_SSHPORT root@$TCLI_SERVERSETUP_SERVERIP "systemctl restart ssh.service"
+	TCLI_PACKMANAGER_REMOTE_SERVER_PORT=$TCLI_SERVERSETUP_SSHPORT_HARDNESS
+	infoscreendone
 }
 
 ################################################################################
-# Nginx
+# Hardness Server part2 firewall
 ################################################################################
-install_nginx() {
-    infoscreen "SS Install" "Nginx"
-    nginxsetup_remote 1 serverrootcmd
-    nginxsetup_install
-    [ ! -z $NGINX_DOMAIN_NAMES ] && nginxsetup_add_domain $NGINX_DOMAIN_NAMES
-    # serverrootcmd "nft add rule inet filter input tcp dport 80 accept"
-    # serverrootcmd "nft add rule inet filter input tcp dport 443 accept"
-    infoscreendone
+tcli_serversetup_hardness_server_firewall() {
+	infoscreen "SS Setup" "Hardness server firewall nftables"
+	tcli_serversetup_serverrootCmd "nft flush ruleset"
+	tcli_serversetup_serverrootCmd "nft add table inet filter"
+	tcli_serversetup_serverrootCmd "nft add chain inet filter input { type filter hook input priority 0 \; policy accept\;}"
+	# allow established/related connections
+	tcli_serversetup_serverrootCmd "nft add rule inet filter input ct state established,related accept"
+	# early drop of invalid connections
+	tcli_serversetup_serverrootCmd "nft add rule inet filter input ct state invalid drop"
+	# allow from loopback
+	tcli_serversetup_serverrootCmd "nft add rule inet filter input iifname lo accept"
+	tcli_serversetup_serverrootCmd "nft add rule inet filter input iif != \"lo\" ip daddr 127.0.0.0/8 drop"
+	# allow icmp
+	tcli_serversetup_serverrootCmd "nft add rule inet filter input ip protocol icmp limit rate 4/second accept"
+	tcli_serversetup_serverrootCmd "nft add rule inet filter input ip6 nexthdr icmpv6 limit rate 4/second accept"
+	tcli_serversetup_serverrootCmd "nft add rule inet filter input tcp dport $TCLI_SERVERSETUP_SSHPORT_HARDNESS accept"
+	tcli_serversetup_serverrootCmd "nft add chain inet filter forward { type filter hook forward priority 0 \; policy accept\; }"
+	tcli_serversetup_serverrootCmd "nft add chain inet filter output { type filter hook output priority 0 \; policy accept\; }"
+	tcli_serversetup_serverrootCmd "nft add chain inet filter input '{ policy drop; }'"
+	infoscreendone
 }
 
 ################################################################################
 # Cerbot
 ################################################################################
-install_certbot() {
-    infoscreen "SS Install" "Certbot"
-    serverrootcmd "apt-get -y install certbot"
-    serverrootcmd "apt-get -y install python3-certbot-nginx"
-    if [[ -d "$DIR_CONF/letsencrypt/live" ]]; then
-        scp -r -P $SSHPORT $DIR_CONF/letsencrypt/* root@$SERVERIP:/etc/letsencrypt/
-    fi
-    (2>/dev/null crontab -l ; echo "@daily certbot renew --quiet && systemctl reload postfix dovecot nginx") | crontab -
-    infoscreendone
-}
-
-################################################################################
-# PostgreSQL 
-################################################################################
-install_postgresql() {
-    infoscreen "SS Install" "PostgreSQL"
-    serverrootcmd "apt-get -y install postgresql postgresql-contrib"
-    serverrootcmd "systemctl start postgresql"
-    serverrootcmd "systemctl enable postgresql"
-    infoscreendone
-}
-
-################################################################################
-# Postfix
-################################################################################
-install_postfix() {
-	infoscreen "SS Install" "Postfix"
-	# Get a certificate using certbot
-	[ -d $DIR/temp/etc/nginx/sites-available ] || mkdir -p $DIR/temp/etc/nginx/sites-available
-	cp $DIR_CONF/nginx/sites-available/mail_server.default $DIR/temp/etc/nginx/sites-available/$POSTFIX_MAIL_NAME
-	sed -i "s/<POSTFIX_MAIL_NAME>/$POSTFIX_MAIL_NAME/g" $DIR/temp/etc/nginx/sites-available/$POSTFIX_MAIL_NAME
-	scp -P $SSHPORT $DIR/temp/etc/nginx/sites-available/$POSTFIX_MAIL_NAME root@$SERVERIP:/etc/nginx/sites-available/$POSTFIX_MAIL_NAME
-	serverrootcmd "ln -s /etc/nginx/sites-available/$POSTFIX_MAIL_NAME /etc/nginx/sites-enabled/"
-	serverrootcmd "systemctl reload nginx"
-	if [[ ! -d $DIR_CONF/letsencrypt/live/$POSTFIX_MAIL_NAME ]]; then
-			# serverrootcmd "certbot certonly -a nginx --agree-tos --no-eff-email --staple-ocsp --email $CERTBOT_EMAIL -d $POSTFIX_MAIL_NAME"
-			echo "TODO"
+tcli_serversetup_cerbot_install() {
+	infoscreen "SS Install" "Certbot"
+	tcli_packageManager_install $TCLI_PKGS_CERTBOT
+	tcli_packageManager_install $TCLI_PKGS_PYTHON_CERTBOT_NGINX
+	if [[ -d "$TCLI_SERVERSETUP_PATH_CONF/letsencrypt/live" ]]; then
+		[ $TCLI_SERVERSETUP_SERVERIP ] \
+			&& scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/* root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/ \
+			|| cp -r $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/* /etc/letsencrypt/
 	fi
-	# install postfix
-	serverrootcmd "echo \"postfix	postfix/mailname string $POSTFIX_MAIL_NAME\" | debconf-set-selections"
-	serverrootcmd "echo \"postfix postfix/main_mailer_type string 'Internet Site'\" | debconf-set-selections"
-	serverrootcmd "DEBIAN_FRONTEND=noninteractive apt-get -y install postfix"
-	infoscreendone
-
-	infoscreen "SS Config" "Postfix"
-	# nft accept port 25, 465,587 so Postfix can receive emails from other SMTP servers
-	serverrootcmd "nft add rule inet filter input tcp dport 25 accept"
-	serverrootcmd "nft add rule inet filter input tcp dport 465 accept"
-	serverrootcmd "nft add rule inet filter input tcp dport 587 accept"
-	serverrootcmd "nft add rule inet filter output tcp dport 25 accept"
-	serverrootcmd "nft add rule inet filter output tcp dport 465 accept"
-	serverrootcmd "nft add rule inet filter output tcp dport 587 accept"
-	# nft accept imaps
-	serverrootcmd "nft add rule inet filter input tcp dport 143 accept"
-	serverrootcmd "nft add rule inet filter input tcp dport 993 accept"
-	# Increase Attachment Size Limit 50mb instead of 10mb
-	serverrootcmd "postconf -e message_size_limit=$POSTFIX_MAILBOX_SIZE_LIMIT"
-	serverrootcmd "systemctl reload postfix"
+	tcli_serversetup_serverrootCmd "(2>/dev/null crontab -l ; echo "@daily certbot renew --quiet && systemctl reload postfix dovecot nginx") | crontab -"
 	infoscreendone
 }
 
-################################################################################
-# Dovecot
-################################################################################
-install_dovecot() {
-    infoscreen "SS Install" "Dovecot"
-    serverrootcmd "apt-get -y install dovecot-core dovecot-imapd dovecot-lmtpd"
-    infoscreendone
-    
-    infoscreen "SS Config" "Dovecot"
-    serverrootcmd "adduser dovecot mail"
-    sed "s/<POSTFIX_MAIL_NAME>/$POSTFIX_MAIL_NAME/g" $DIR_CONF/dovecot/conf.d/10-ssl.conf > $DIR/temp/etc/dovecot/conf.d/10-ssl.conf
-    cp $DIR_CONF/dovecot/dovecot.conf $DIR/temp/etc/dovecot/
-    cp $DIR_CONF/dovecot/conf.d/10-auth.conf $DIR/temp/etc/dovecot/conf.d/
-    cp $DIR_CONF/dovecot/conf.d/10-mail.conf $DIR/temp/etc/dovecot/conf.d/
-    cp $DIR_CONF/dovecot/conf.d/10-master.conf $DIR/temp/etc/dovecot/conf.d/
-    scp -r -P $SSHPORT $DIR/temp/etc/dovecot root@$SERVERIP:/etc/
-    # serverrootcmd "systemctl restart dovecot" #TODO
-    infoscreendone
+# param
+#		<hostname>
+tcli_serversetup_cerbot_add_certificate() {
+	tcli_serversetup_serverrootCmd "certbot certonly -a nginx --agree-tos --no-eff-email --staple-ocsp --email $TCLI_SERVERSETUP_CERTBOT_EMAIL -d $1"
 }
 
 ################################################################################
-# Postfix admin
+# Nginx
 ################################################################################
-install_postfix_admin() {
-    infoscreen "SS Config" "Dovecot"
-    serverrootcmd "mkdir -p /srv/www/postfixadmin"
-    serverrootcmd "wget https://github.com/postfixadmin/postfixadmin/archive/$POSTFIX_ADMIN_VER.tar.gz"
-    serverrootcmd "tar -xf $POSTFIX_ADMIN_VER.tar.gz -C /srv/www/"
-    serverrootcmd "mv /srv/www/postfixadmin-$POSTFIX_ADMIN_VER /srv/www/postfixadmin"
-    serverrootcmd "mkdir -p /srv/www/postfixadmin/templates_c"
-    serverrootcmd "apt-get -y install acl"
-    serverrootcmd "setfacl -R -m u:www-data:rwx /srv/www/postfixadmin/templates_c/"
-    serverrootcmd "setfacl -R -m u:www-data:rx /etc/letsencrypt/live/ /etc/letsencrypt/archive/"
-    
-    serverrootcmd "su postgres <<EOF
-    psql -c \"CREATE DATABASE postfixadmin;\"
-    psql -c \"CREATE USER postfixadmin WITH PASSWORD $POSTFIX_ADMIN_PASSWORD;\"
-    psql -c \"ALTER DATABASE postfixadmin OWNER TO postfixadmin;\"
-    psql -c \"GRANT ALL PRIVILEGES ON DATABASE postfixadmin TO postfixadmin;\"
-    EOF"
-
-    infoscreendone
+tcli_serversetup_nginx_install() {
+	infoscreen "SS Install" "Nginx"
+	tcli_nginxsetup_remote 1 tcli_serversetup_serverrootCmd
+	tcli_nginxsetup_install
+	declare -i c=$(yq e '.NginxSetup.WebSites | length' < $TCLI_SERVERSETUP_FILE_CONF)
+	echo "c is $c"
+	for (( i=0; i < $c; i++ )); do
+		declare s=$(yq eval ".NginxSetup.WebSites[$i]" < $TCLI_SERVERSETUP_FILE_CONF)
+		declare domainName=$(yq eval ".NginxSetup.WebSites[$i].domainName" < $TCLI_SERVERSETUP_FILE_CONF)
+		declare siteType=$(yq eval ".NginxSetup.WebSites[$i].siteType" < $TCLI_SERVERSETUP_FILE_CONF)
+		echo "setting up website $domainName as a $siteType"
+		tcli_nginxsetup_add_domain "$domainName" "$siteType"
+		if [ -d $($TCLI_SERVERSETUP_PATH_CONF/letsencrypt/live/$domainName) ]; then
+			scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/live/$domainName/ root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/live/
+			scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/archive/$domainName/ root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/archive/
+			$tcli_serversetup_serverrootCmd "echo 1 | certbot --nginx -d $domainName"
+		else
+			# tcli_serversetup_cerbot_add_certificate $domainName
+			echo "${BASH_SOURCE}:${FUNCNAME}:${LINENO} undo comments"
+		fi
+	done
+	infoscreendone
 }
 
-################################################################################
-# 
-################################################################################
-
-prepare
-create_user
-hardness_server
-[ ${NGINXSETUP:-0} ] && install_nginx || printf "\nFailed to setup nginx\n"
-# install_certbot
-# install_postgresql
-# install_postfix
-# install_dovecot
-# install_postfix_admin
-
-# serverrootcmd "nft list ruleset > /etc/nftables.conf"
-# serverrootcmd "systemctl enable nftables.service"
-# serverrootcmd "systemctl restart nftables.service"
-
-unset SSHPASS
-printf "################################################################################\n" 1>&3
-printf "#                                    Finish                                    #\n" 1>&3
-printf "################################################################################\n" 1>&3
+tcli_serversetup_prepare
+tcli_serversetup_create_user
+tcli_serversetup_hardness_server
+tcli_serversetup_hardness_server_firewall
+tcli_serversetup_cerbot_install
+[ $TCLI_SERVERSETUP_NGINX_SETUP ] && tcli_serversetup_nginx_install
