@@ -17,12 +17,20 @@ yq to parse settings that is stored as YAML
 	./install.sh
 	
 ## Tools
-In the folder tools you can find
+In the tools folder you can find following scripts
 
-### Backup letsencrypt certificate
-It will backup your certificate and store it under conf/letsencrypt
-	
+### Backup server files
+#### Certificate from lets encrypt
+It will backup your certificate and store it under conf/letsencrypt/backup_certificate.tar.gz
+
+	cd src/ServerSetup/tools
 	bash backup_letsencrypt_cert.sh
+
+#### Nginx sites configuration
+It will backup your nginx sites configurations and store it under conf/nginx/backup_nginx_sites_configuration.tar.gz
+
+	cd src/ServerSetup/tools
+	bash backup_nginx_site_conf.sh
 
 ## Features
 * Create a privileged user

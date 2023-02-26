@@ -1,13 +1,14 @@
 #!/bin/bash
 
+################################################################################
+# Bacnup let's encrypt certificate from server
+################################################################################
+
 # Setting path structure and file
 declare -r TCLI_SERVERSETUP_PATH_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-declare -r TCLI_SERVERSETUP_PATH_CONF="$TCLI_SERVERSETUP_PATH_ROOT/conf"
+declare -r TCLI_SERVERSETUP_PATH_INC="$TCLI_SERVERSETUP_PATH_ROOT/inc"
 
-[ -f "$TCLI_SERVERSETUP_PATH_CONF/settings.yaml" ] && TCLI_SERVERSETUP_FILE_CONF=$TCLI_SERVERSETUP_PATH_CONF/settings.yaml || TCLI_SERVERSETUP_FILE_CONF=$TCLI_SERVERSETUP_PATH_CONF/settings.default.yaml
+. $TCLI_SERVERSETUP_PATH_INC/inc.sh
 
-TCLI_SERVERSETUP_SSHPORT_HARDNESS=$(yq eval ".Server.RemoteSetup.sshPortHardness" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_SSHPORT_HARDNESS = null ] && TCLI_SERVERSETUP_SSHPORT_HARDNESS=10233
-TCLI_SERVERSETUP_SERVERIP=$(yq eval ".Server.RemoteSetup.ip" < $TCLI_SERVERSETUP_FILE_CONF)
-
-scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/live $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/
-scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP:/etc/letsencrypt/archive $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/
+ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP "tar -cvf $TCLI_SERVERSETUP_FILE_CERT_BACKUP /etc/letsencrypt/archive /etc/letsencrypt/live /etc/letsencrypt/renewal /etc/letsencrypt/options-*.conf"
+scp -r -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP:~/$TCLI_SERVERSETUP_FILE_CERT_BACKUP $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/
