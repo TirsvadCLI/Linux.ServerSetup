@@ -62,7 +62,7 @@ infoscreendone
 ################################################################################
 tcli_serversetup_serverrootCmd() {
 	[ ${TCLI_SERVERSETUP_SERVERIP:-} ] && ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP $@ # || $@
-	echo "ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP $@"
+	# echo "ssh -p $TCLI_SERVERSETUP_SSHPORT_HARDNESS root@$TCLI_SERVERSETUP_SERVERIP $@"
 }
 
 tcli_serversetup_serverusercmd() {
@@ -89,7 +89,14 @@ tcli_serversetup_prepare () {
 	infoscreen "SS install" "Update and upgrade OS"
 	tcli_packageManager_system_update
 	tcli_packageManager_system_upgrade
-	tcli_packageManager_install "sudo"
+	case $DISTRIBUTION_ID in
+	"Debian GNU/Linux")
+		tcli_packageManager_install "sudo"
+		;;
+	"Ubuntu")
+		tcli_packageManager_install "sudo"
+		;;
+	esac		
 	ssh -p $TCLI_SERVERSETUP_SSHPORT root@$TCLI_SERVERSETUP_SERVERIP "hostnamectl set-hostname $primaryHostname"
 	infoscreendone
 }
@@ -171,8 +178,16 @@ tcli_serversetup_hardness_server_firewall() {
 ################################################################################
 tcli_serversetup_cerbot_install() {
 	infoscreen "SS Install" "Certbot"
-	tcli_packageManager_install "certbot"
-	tcli_packageManager_install "python3-certbot-nginx"
+	case $DISTRIBUTION_ID in
+	"Debian GNU/Linux")
+		tcli_packageManager_install "certbot"
+		tcli_packageManager_install "python3-certbot-nginx"
+		;;
+	"Ubuntu")
+		tcli_packageManager_install "certbot"
+		tcli_packageManager_install "python3-certbot-nginx"
+		;;
+	esac		
 	if [[ -f "$TCLI_SERVERSETUP_PATH_CONF/letsencrypt/$TCLI_SERVERSETUP_FILE_CERT_BACKUP" ]]; then
 		scp -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/$TCLI_SERVERSETUP_FILE_CERT_BACKUP root@$TCLI_SERVERSETUP_SERVERIP:~/
 		tcli_serversetup_serverrootCmd "tar -xvf ~/$TCLI_SERVERSETUP_FILE_CERT_BACKUP -C /"
@@ -220,9 +235,30 @@ tcli_serversetup_nginx_install() {
 	infoscreendone
 }
 
+################################################################################
+# PostgreSQL 
+################################################################################
+install_postgresql() {
+	infoscreen "SS Install" "PostgreSQL"
+	case $DISTRIBUTION_ID in
+	"Debian GNU/Linux")
+		tcli_packageManager_install "postgresql postgresql-contrib"
+		tcli_serversetup_serverrootCmd "systemctl start postgresql"
+		tcli_serversetup_serverrootCmd "systemctl enable postgresql"
+		;;
+	"Ubuntu")
+		tcli_packageManager_install "postgresql postgresql-contrib"
+		tcli_serversetup_serverrootCmd "systemctl start postgresql"
+		tcli_serversetup_serverrootCmd "systemctl enable postgresql"
+		;;
+	esac	
+	infoscreendone
+}
+
 tcli_serversetup_prepare
 tcli_serversetup_create_user
 tcli_serversetup_hardness_server
 tcli_serversetup_hardness_server_firewall
 tcli_serversetup_cerbot_install
 [ $TCLI_SERVERSETUP_NGINX_SETUP ] && tcli_serversetup_nginx_install
+[ "$(yq eval ".PostgreSql.install" < $TCLI_SERVERSETUP_FILE_CONF)" == "null" ] || install_postgresql

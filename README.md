@@ -1,19 +1,31 @@
 # Linux Server Setup
-This script aimed goal is to set up a complete web server environment.
+This script aimed goal is to set up a complete web server environment. Script can be run from a local system with internet access to server.
 
 ## Requirement
 Debian or Ubuntu fresh install. Other Linux distribution may be added.
 
+###
+We depend on following packages to be installed
+
+yq - a lightweight and portable command-line YAML processor, se more at https://github.com/mikefarah/yq/#install
+
+	snap install yq
+
 ## Installation
 
-### First needed packages
-yq to parse settings that is stored as YAML
-
-### Get it
+### How to get this
 
 	curl -o ServerSetup.tar -L https://github.com/TirsvadCLI/Linux.ServerSetup/tarball/master
 	mkdir -p ServerSetup && tar xpvf ServerSetup.tar -C "ServerSetup" --strip-components=1
+
+In configuration file you make your changes
+
 	cd ServerSetup
+	cp conf/settings.default.yaml conf/settings.yaml
+	nano conf/settings.yaml
+
+When you are ready to do the setup of server
+
 	./install.sh
 	
 ## Tools
@@ -34,17 +46,18 @@ It will backup your nginx sites configurations and store it under conf/nginx/bac
 
 ## Features
 * Create a privileged user
-  * option add ssh-key
-* sshd
-  * option ssh-key for passwordless connection
-  * option disable root login
+  * creating ssh-key
+* ssh and hardness server
+  * ssh-key for passwordless connection
 * Setting hostname
 * Update system software
 * Nginx webserver (optional)
 	* Letsencrypt certificate
+* Database
+	* Postgresql (ptional)
 
 ### TODO
-* Optional database Postgresql and Mysql
+* Optional database Mysql
 * Firewall
   * Automatic configure based on choices made
 1. Optional web application envoriment

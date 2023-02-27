@@ -14,15 +14,17 @@ Server:
     sshRootPass: '<installation server root password>' # Root password it can also be put as envoriment variable 'export SSHPASS' then comment this line out
   certbotEmail: '<admin@example.com>' # CHANGE ME
 NginxSetup:
-  install: 1 # 0 don't setup webserver, 1 => install nginx server and add websites # will deprece soon
+  install: 1 # 1 => install, 0 => do not install
   WebSites:
     - domainName: example.com # CHANGE ME  or COMMENT OUT LINES
       siteType: html
-    # - domainName: test.example.com # CHANGE ME
-    #   siteType: html
+    - domainName: test.example.com # CHANGE ME
+      siteType: html
     # - domainName: example2.com # CHANGE ME
     #   siteType: html
   Paths:
     # wwwBase: /srv/www/
     # sitesAvailable: /etc/nginx/sites-available/
     # sitesEnabled: /etc/nginx/sites-enabled/
+PostgreSql:
+  install: 1 # 1 => install, 0 => do not install (default)
