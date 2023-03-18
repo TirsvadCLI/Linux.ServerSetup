@@ -29,7 +29,7 @@ fi
 # We need nc (netcat)
 if ! (which nc); then
 	infoscreenfailed
-	printf "\n${RED}sshpass need to be installed"
+	printf "\n${RED}netcat need to be installed"
 	[ $DISTRIBUTION_ID == "Debian GNU/Linux" ] && printf "sudo apt install netcat${NC}" >&3
 	[ $DISTRIBUTION_ID == "Ubuntu" ] && printf "sudo apt install netcat${NC}" >&3
 	exit 1

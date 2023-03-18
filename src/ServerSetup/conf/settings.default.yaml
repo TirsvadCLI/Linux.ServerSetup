@@ -1,18 +1,31 @@
 ---
 primaryHostname: example.com # CHANGE ME
 Server:
+  #
+  # Add system users
+  #
   Users:
-    - name: myuser # CHANGE ME
       # How to get encrypted password
-      # Encrypt password for user - python3 -c 'import crypt; print(crypt.crypt("secret", "salt"))'
+      # Encrypt password for user - python3 -c 'import crypt; print(crypt.crypt("password", "salt"))'
+    - name: myuser # CHANGE ME
       passwordEncrypted: 'some encrypted password' # CHANGE ME
       superuser: 1
+  #
+  # Remote connection for server
+  #
   RemoteSetup:
     ip: <installation server ip address>
     # sshPort: 22 # Will be disabled after hardness of server
     # sshPortHardness: 10233 # After hardness of server
     sshRootPass: '<installation server root password>' # Root password it can also be put as envoriment variable 'export SSHPASS' then comment this line out
+  #
+  # For secure our connect we use LetsEncrypt
+  # Add a email address for LetsEncrypt
+  #
   certbotEmail: '<admin@example.com>' # CHANGE ME
+#
+# Web server install and configurations
+#
 NginxSetup:
   install: 1 # 1 => install, 0 => do not install
   WebSites:
@@ -22,9 +35,30 @@ NginxSetup:
       siteType: html
     # - domainName: example2.com # CHANGE ME
     #   siteType: html
+    #   siteConf: server.default
   Paths:
-    # wwwBase: /srv/www/
-    # sitesAvailable: /etc/nginx/sites-available/
-    # sitesEnabled: /etc/nginx/sites-enabled/
+    # wwwBase: /srv/www
+    # sitesAvailable: /etc/nginx/sites-available
+    # sitesEnabled: /etc/nginx/sites-enabled
 PostgreSql:
   install: 1 # 1 => install, 0 => do not install (default)
+#
+# Email Server
+# Using postfix and dovecot
+#
+Postfix:
+  install: 1 # 1 => install, 0 => do not install (default)
+  hostname: "mail.example.com"
+  #mailboxSizeLimit: 10240000 # default value 10240000
+PostfixAdmin:
+  #
+  # GUI for administration of email accounts
+  # 
+  # For new installation we need to generate a setup password and add $CONF['setup_password'] = 'encryptet_password'
+  # get encryptet password type this in terminal: php -r 'echo password_hash("my_setup_password", PASSWORD_DEFAULT);'
+  install: 1 # 1 => install, 0 => do not install (default)
+  version: 3.3.13
+  passwordDatabase: "secret" # CHANGE ME
+  passwordSetup: ""
+  DomainNames:
+    - domainName: postfix.example.com # CHANGE ME

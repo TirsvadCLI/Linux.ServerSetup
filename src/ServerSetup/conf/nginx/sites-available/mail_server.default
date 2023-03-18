@@ -1,7 +1,7 @@
 server {
 	listen 80;
 	listen [::]:80;
-	server_name <POSTFIX_MAIL_NAME>;
+	server_name <POSTFIX_HOSTNAME>;
 
 	root /usr/share/nginx/html/;
 

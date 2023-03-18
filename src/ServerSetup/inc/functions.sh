@@ -23,7 +23,15 @@ infoscreendone() {
 infoscreenfailed() {
 	[ ${INFOSCREEN_WARN} ] && unset INFOSCREEN_WARN
 	printf "\r\033[1C${RED}FAILED${NC}\n" >&3
-	[ ${1} ] && printf "${RED}$1" >&3
+	[ ${1} ] && printf "${RED}${1:-}" >&3
+	[ ${2} ] && printf " ${BLUE}$2" >&3
+	[ ${3} ] && printf " ${RED}$3" >&3
+	printf "${NC}\n" >&3
+}
+
+infoscreenFailedExit() {
+	printf "\r\033[1C${RED}FAILED${NC}\n" >&3
+	[ ${1} ] && printf "${RED}${1:-}" >&3
 	[ ${2} ] && printf " ${BLUE}$2" >&3
 	[ ${3} ] && printf " ${RED}$3" >&3
 	printf "${NC}\n" >&3
@@ -41,4 +49,14 @@ infoscreenstatus() {
     else
         infoscreendone
     fi
+}
+
+errorCheck() {
+	if [ "$?" = "0" ]; then
+		printf "${RED}An error has occured.${NC}" >&3
+		# read -p "Press enter or space to ignore it. Press any other key to abort." -n 1 key
+		# if [[ $key != "" ]]; then
+		# 	exit
+		# fi
+	fi
 }

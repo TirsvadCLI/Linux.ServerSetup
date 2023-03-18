@@ -4,4 +4,5 @@ src/ServerSetup/conf/letsencrypt/*/
 *.old
 /src/ServerSetup/conf/settings.yaml
 src/ServerSetup/conf/nginx/backup_nginx_sites_configuration.tar.gz
-src/ServerSetup/conf/letsencrypt/backup_certificate.tar.gz
+src/ServerSetup/backup/*
+documentation/*

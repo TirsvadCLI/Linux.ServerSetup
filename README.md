@@ -17,10 +17,10 @@ yq - a lightweight and portable command-line YAML processor, se more at https://
 
 	curl -o ServerSetup.tar -L https://github.com/TirsvadCLI/Linux.ServerSetup/tarball/master
 	mkdir -p ServerSetup && tar xpvf ServerSetup.tar -C "ServerSetup" --strip-components=1
-
+	cd ServerSetup/src/ServerSetup
+	
 In configuration file you make your changes
 
-	cd ServerSetup
 	cp conf/settings.default.yaml conf/settings.yaml
 	nano conf/settings.yaml
 
@@ -53,8 +53,10 @@ It will backup your nginx sites configurations and store it under conf/nginx/bac
 * Update system software
 * Nginx webserver (optional)
 	* Letsencrypt certificate
-* Database
-	* Postgresql (ptional)
+* Database (optional)
+	* Postgresql 
+* Email server (optional)
+	* Postfix, dovecot and postfixadmin 
 
 ### TODO
 * Optional database Mysql
@@ -68,7 +70,6 @@ It will backup your nginx sites configurations and store it under conf/nginx/bac
 2. Optional e-mail server
   * spam filter
   * anti virus
-  * easy add email via web tool
 
 ### Development
 Want to contribute? Great!\
