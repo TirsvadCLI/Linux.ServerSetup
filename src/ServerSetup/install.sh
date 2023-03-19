@@ -47,7 +47,7 @@ TCLI_SERVERSETUP_PRIMARYHOSTANME=$(yq eval ".primaryHostname" < $TCLI_SERVERSETU
 TCLI_SERVERSETUP_SSHPORT=$(yq eval ".Server.RemoteSetup.sshPort" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_SSHPORT = null ] && TCLI_SERVERSETUP_SSHPORT=22
 TCLI_SERVERSETUP_SSHPORT_HARDNESS=$(yq eval ".Server.RemoteSetup.sshPortHardness" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_SSHPORT_HARDNESS = null ] && TCLI_SERVERSETUP_SSHPORT_HARDNESS=10233
 
-TCLI_SERVERSETUP_CERTBOT_EMAIL=$(yq eval ".Server.certbotEmail" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_CERTBOT_EMAIL = null ] && TCLI_SERVERSETUP_CERTBOT_EMAIL="admin@"
+TCLI_SERVERSETUP_CERTBOT_EMAIL=$(yq eval ".LetsEncrypt.certbotEmail" < $TCLI_SERVERSETUP_FILE_CONF); [ $TCLI_SERVERSETUP_CERTBOT_EMAIL = null ] && TCLI_SERVERSETUP_CERTBOT_EMAIL="admin@"
 
 TCLI_SERVERSETUP_NGINX_SETUP=$(yq eval ".NginxSetup.install" < $TCLI_SERVERSETUP_FILE_CONF)
 
@@ -240,8 +240,8 @@ tcli_serversetup_nginx_install() {
 	tcli_serversetup_serverrootCmd "nft add rule inet filter input tcp dport 80 accept"
 	tcli_serversetup_serverrootCmd "nft add rule inet filter input tcp dport 443 accept"
 
-	if [[ -f "$TCLI_SERVERSETUP_PATH_CONF/nginx/$TCLI_SERVERSETUP_FILE_NGINX_SITES_CONF_BACKUP" ]]; then
-		scp -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/letsencrypt/$TCLI_SERVERSETUP_FILE_NGINX_SITES_CONF_BACKUP root@$TCLI_SERVERSETUP_SERVERIP:~/
+	if [[ -f "$TCLI_SERVERSETUP_PATH_CONF/backup/$TCLI_SERVERSETUP_FILE_NGINX_SITES_CONF_BACKUP" ]]; then
+		scp -P $TCLI_SERVERSETUP_SSHPORT_HARDNESS $TCLI_SERVERSETUP_PATH_CONF/backup/$TCLI_SERVERSETUP_FILE_NGINX_SITES_CONF_BACKUP root@$TCLI_SERVERSETUP_SERVERIP:~/
 		tcli_serversetup_serverrootCmd "tar -xvf ~/$TCLI_SERVERSETUP_FILE_NGINX_SITES_CONF_BACKUP -C /"
 	fi	
 	mkdir -p ${TCLI_SERVERSETUP_PATH_TEMP}/etc/nginx/sites-available
@@ -394,7 +394,6 @@ tcli_serversetup_postfixadmin_install() {
 
 	tcli_serversetup_serverrootCmd "wget https://github.com/postfixadmin/postfixadmin/archive/refs/tags/postfixadmin-$_postfixAdmin_version.tar.gz"
 	tcli_serversetup_serverrootCmd "tar tzf postfixadmin-$_postfixAdmin_version.tar.gz | sed -e 's@/.*@@' | uniq"
-	echo "Terminal output $TCLI_SERVERSETUP_TERMINAL_OUTPUT"
 
 	[ ! -z $TCLI_SERVERSETUP_TERMINAL_OUTPUT ] && local _postfixadmin_root_folder=/srv/www/$TCLI_SERVERSETUP_TERMINAL_OUTPUT || infoscreenFailedExit "postfix admin retrieve folder name failed"
 	tcli_serversetup_serverrootCmd "tar -xf postfixadmin-$_postfixAdmin_version.tar.gz -C /srv/www/"
@@ -408,7 +407,6 @@ tcli_serversetup_postfixadmin_install() {
 	tcli_serversetup_serverrootCmd "sudo -u postgres -i psql -c 'GRANT ALL PRIVILEGES ON DATABASE postfixadmin TO postfixadmin;'"
 
 	local _postfixadmin_config_local_path_file="${_postfixadmin_root_folder}/config.local.php"
-	echo "_postfixadmin_config_local_path_file = ${_postfixadmin_config_local_path_file}"
 	tcli_serversetup_serverrootCmd "printf \"<?php\n\" > $_postfixadmin_config_local_path_file"
 	tcli_serversetup_serverrootCmd "printf \"\$CONF['configured'] = true;\n\" >> $_postfixadmin_config_local_path_file"
 	tcli_serversetup_serverrootCmd "printf \"\$CONF['database_type'] = 'pgsql';\n\" >> $_postfixadmin_config_local_path_file"

@@ -18,6 +18,8 @@ yq - a lightweight and portable command-line YAML processor, se more at https://
 	curl -o ServerSetup.tar -L https://github.com/TirsvadCLI/Linux.ServerSetup/tarball/master
 	mkdir -p ServerSetup && tar xpvf ServerSetup.tar -C "ServerSetup" --strip-components=1
 	cd ServerSetup/src/ServerSetup
+	git submodule init
+	git submodule update
 	
 In configuration file you make your changes
 
