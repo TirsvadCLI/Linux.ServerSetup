@@ -13,5 +13,6 @@ TCLI_SERVERSETUP_SERVERIP=$(yq eval ".Server.RemoteSetup.ip" < $TCLI_SERVERSETUP
 
 declare -r TCLI_SERVERSETUP_FILE_CERT_BACKUP='backup_certificate.tar.gz'
 declare -r TCLI_SERVERSETUP_FILE_NGINX_SITES_CONF_BACKUP='backup_nginx_sites_configuration.tar.gz'
+declare -r TCLI_SERVERSETUP_FILE_WEBSITES_BACKUP='backup_websites.tar.gz'
 
 declare TCLI_SERVERSETUP_TERMINAL_OUTPUT=""

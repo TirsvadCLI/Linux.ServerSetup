@@ -1,31 +1,26 @@
 ---
 primaryHostname: example.com # CHANGE ME
 Server:
-  #
   # Add system users
-  #
   Users:
-      # How to get encrypted password
-      # Encrypt password for user - python3 -c 'import crypt; print(crypt.crypt("password", "salt"))'
+    # How to get encrypted password
+    # Encrypt password for user - python3 -c 'import crypt; print(crypt.crypt("password", "salt"))'
     - name: myuser # CHANGE ME
       passwordEncrypted: 'some encrypted password' # CHANGE ME
       superuser: 1
   #
-  # Remote connection for server
+  # Remote connection to server
   #
   RemoteSetup:
     ip: <installation server ip address>
     # sshPort: 22 # Will be disabled after hardness of server
     # sshPortHardness: 10233 # After hardness of server
     sshRootPass: '<installation server root password>' # Root password it can also be put as envoriment variable 'export SSHPASS' then comment this line out
-  #
-  # For secure our connect we use LetsEncrypt
+# For secure our connect for webserver and email server we use LetsEncrypt
+LetsEncrypt:
   # Add a email address for LetsEncrypt
-  #
   certbotEmail: '<admin@example.com>' # CHANGE ME
-#
 # Web server install and configurations
-#
 NginxSetup:
   install: 1 # 1 => install, 0 => do not install
   WebSites:
@@ -61,4 +56,4 @@ PostfixAdmin:
   passwordDatabase: "secret" # CHANGE ME
   passwordSetup: ""
   DomainNames:
-    - domainName: postfix.example.com # CHANGE ME
+    - domainName: postfixadmin.example.com # CHANGE ME
